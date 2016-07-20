@@ -1,0 +1,110 @@
+<!doctype>
+<html>
+<head>
+<script type='text/javascript'>
+
+var users = web3.eth.accounts;
+var names = ['Miner','Alice','Bob','Eve','Fred'];
+var polypay = contracts['PolyPay'].contract;
+
+function userId () {
+	return document.getElementById('userID').value;
+}
+	
+function userAddr() {
+	return users[userId()];
+}
+	
+function recipId () {
+	return document.getElementById('recipID').value;
+}
+	
+function recipAddr() {
+	return users[recipId()];
+}
+
+function balance() {
+	return web3.eth.getBalance(userAddr());
+}
+function balanceOf(_addr){
+	return polypay.balanceOf(_addr);	
+}
+
+function tokensOf(_addr) {
+	return polypay.tokensOf(_addr);
+}
+
+function claim() {
+	return polypay.claim(userAddr(),{from:userAddr()}, update());
+}
+
+function pay() {
+	web3.eth.sendTransaction({from:userAddr(), to:contracts['PolyPay'].address, value:amount()}, update());
+}
+
+function amount() {
+	return document.getElementById('payAmount').value * 10e17;	
+}
+
+function paymentsToDate() {
+	return polypay.paymentsToDate();
+}
+	
+function unclaimed() {
+	return web3.eth.getBalance(contracts['PolyPay'].address);
+}
+
+function transfer() {
+	var amount = document.getElementById('tokenAmount').value;
+	return polypay.transfer(recipAddr(), amount,{from:userAddr()});
+}
+	
+function userUpdate() {
+	document.getElementById('userName').innerText = names[userId()];
+	document.getElementById('addr1').innerText = userAddr();
+	document.getElementById('bal').innerText = balance() * 10e-19;
+	document.getElementById('ppbal').innerText = balanceOf(userAddr()) * 10e-19;
+	document.getElementById('ppshares').innerText = tokensOf(userAddr());
+}
+
+function recipUpdate() {
+	document.getElementById('addr2').innerText = recipAddr();
+	document.getElementById('recipName').innerText = names[recipId()];
+}
+
+function ppUpdate(){
+	document.getElementById('unclaimed').innerText = unclaimed() * 10e-19;
+	document.getElementById('totpayments').innerText = paymentsToDate() * 10e-19;;
+}
+
+function update(){
+	console.log('updating');
+	ppUpdate();
+	userUpdate();
+	recipUpdate();
+}
+</script>
+</head>
+<body bgcolor='#E6E6FA' onload='update()'>
+	<h3>PolyPay	<input value='Refresh' type='button' onclick='update()' /><br>
+</h3>
+<div>
+	Total Payments:<span id='totpayments'>0</span>eth<br>
+	Unclaimed:<span id='unclaimed'>0</span>eth<br>
+	Payment Amount:<input type='number' id='payAmount'>
+	<input value='Pay' type='button' id='query' onclick='pay()' /><br>
+	User:<input type='number' id='userID' max='4' min='0' value='0' onchange='userUpdate()'><span id='userName'></span><br>
+	Addr:<span id='addr1'>0x</span><br>
+	Ether:<span id='bal'>0</span>eth<br>
+	PPUnclaimed:<span id='ppbal'>0</span>eth<input value='Claim' type='button' id='claim' onclick='claim()' /><br>
+	PPShare:<span id='ppshares'>0</span>tokens<br>
+	<br>
+	Recipient:<input type='number' id='recipID' max='4' min='0' value='0' onchange='recipUpdate()'><span id='recipName'></span><br>
+	Addr:<span id='addr2'>0x</span><br>
+	<input type='number' id='tokenAmount' min='0' value='0'>
+	<input value='Transfer' type='button' id='trans' onclick='transfer()' /><br>
+</div>
+<div>
+</div>
+</body>
+</html>
