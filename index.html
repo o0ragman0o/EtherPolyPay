@@ -2,17 +2,29 @@
 <html>
 <head>
 <script type='text/javascript'>
+var epp = contracts['EtherPolyPay'].contract;
+var eppAddr = contracts['EtherPolyPay'].address;
+var metrics = [];
+var Swap = {BUY:0, SELL:1};
+var bids = [];
+var asks = [];
+var BID = false;
+var ASK = true;
+var decimalPlaces;
 
 var users = web3.eth.accounts;
 var names = ['Miner','Alice','Bob','Eve','Fred'];
-var polypay = contracts['PolyPay'].contract;
 
-function userId () {
-	return document.getElementById('userID').value;
+function accId() {
+	return document.getElementById('accid').value;	
 }
-	
+
+function acc() {
+	return web3.eth.accounts[accId()];
+}
+
 function userAddr() {
-	return users[userId()];
+	return users[acc()];
 }
 	
 function recipId () {
@@ -24,87 +36,135 @@ function recipAddr() {
 }
 
 function balance() {
-	return web3.eth.getBalance(userAddr());
+	return web3.eth.getBalance(acc());
 }
-function balanceOf(_addr){
-	return polypay.balanceOf(_addr);	
+	
+function etherBalance(_addr){
+	return epp.etherBalances(_addr);	
 }
 
-function tokensOf(_addr) {
-	return polypay.tokensOf(_addr);
+function balanceOf(_addr) {
+	return epp.balanceOf(_addr);
 }
 
 function claim() {
-	return polypay.claim(userAddr(),{from:userAddr()}, update());
+	epp.claimEther(acc(),{from:acc()});
+	update()
 }
 
 function pay() {
-	web3.eth.sendTransaction({from:userAddr(), to:contracts['PolyPay'].address, value:amount()}, update());
+	web3.eth.sendTransaction({from:acc(), to:eppAddr, value:amount()});
+	update();
 }
 
 function amount() {
-	return document.getElementById('payAmount').value * 10e17;	
+	return document.getElementById('payAmount').value; // * 10e17;	
 }
 
 function paymentsToDate() {
-	return polypay.paymentsToDate();
+	return epp.paymentsToDate();
 }
 	
 function unclaimed() {
-	return web3.eth.getBalance(contracts['PolyPay'].address);
+	return epp.unclaimed();
 }
 
 function transfer() {
 	var amount = document.getElementById('tokenAmount').value;
-	return polypay.transfer(recipAddr(), amount,{from:userAddr()});
+	return epp.transfer(recipAddr(), amount,{from:acc()});
 }
 	
-function userUpdate() {
-	document.getElementById('userName').innerText = names[userId()];
-	document.getElementById('addr1').innerText = userAddr();
-	document.getElementById('bal').innerText = balance() * 10e-19;
-	document.getElementById('ppbal').innerText = balanceOf(userAddr()) * 10e-19;
-	document.getElementById('ppshares').innerText = tokensOf(userAddr());
+function getBidBook() {
+	var price = document.getElementById('highestBid').innerText;
+	while(price > 0) {
+		var ordNum = 0;
+		while (ordNum != 2^256-1) {			
+		}
+	}	
 }
+	
+function sell() {
+	var price = document.getElementById('price').value;
+	var amount = document.getElementById('amount').value * decimalPlaces;
+	var make = document.getElementById('make').checked;
+	orderNum = epp.sell(price, amount, make,
+								 {from:acc()});
+	update();
+}
+
+function buy() {
+	var price = document.getElementById('price').value;
+	var amount = document.getElementById('amount').value * decimalPlaces;
+	var make = document.getElementById('make').checked;
+	var reqEther = price * amount - metrics[1];
+	reqEther = reqEther < 0 ? 0 : reqEther;
+	orderNum = epp.buy(price, amount, make,
+					   {from:acc(), value:price * amount - metrics[1]});
+	update();
+}
+	
+function withdraw() {
+	var amount = epp.etherBalances(acc());
+	epp.withdraw(amount, {from:acc()});
+	update();
+}
+
 
 function recipUpdate() {
 	document.getElementById('addr2').innerText = recipAddr();
 	document.getElementById('recipName').innerText = names[recipId()];
 }
 
-function ppUpdate(){
-	document.getElementById('unclaimed').innerText = unclaimed() * 10e-19;
-	document.getElementById('totpayments').innerText = paymentsToDate() * 10e-19;;
+function update() {
+	console.log('updating');
+	recipUpdate();
+	document.getElementById('accAddr').innerText = acc();
+	document.getElementById('userName').innerText = names[accId()];
+	metrics = epp.getEPPMetrics({from:acc()});
+	document.getElementById('sym').innerText = metrics[11];
+	decimalPlaces = Math.pow(10, metrics[7]);	
+	document.getElementById('balance').innerText = metrics[0]/decimalPlaces;
+	document.getElementById('ethBalance').innerText = metrics[1];
+	document.getElementById('claimable').innerText = metrics[2];
+	document.getElementById('lowestAsk').innerText = metrics[5] == 0 ? 'No Orders' : metrics[3];
+	document.getElementById('highestBid').innerText = metrics[6] == 0 ? 'No Orders' : metrics[4];
+	document.getElementById('askVol').innerText = metrics[5];
+	document.getElementById('bidVol').innerText = metrics[6];
+	document.getElementById('totsupply').innerText = metrics[9];
+	document.getElementById('totpayments').innerText = metrics[7];
+	document.getElementById('unclaimed').innerText = metrics[10];// * 10e-19;
+	
 }
 
-function update(){
-	console.log('updating');
-	ppUpdate();
-	userUpdate();
-	recipUpdate();
-}
 </script>
 </head>
 <body bgcolor='#E6E6FA' onload='update()'>
-	<h3>PolyPay	<input value='Refresh' type='button' onclick='update()' /><br>
-</h3>
-<div>
-	Total Payments:<span id='totpayments'>0</span>eth<br>
-	Unclaimed:<span id='unclaimed'>0</span>eth<br>
-	Payment Amount:<input type='number' id='payAmount'>
-	<input value='Pay' type='button' id='query' onclick='pay()' /><br>
-	User:<input type='number' id='userID' max='4' min='0' value='0' onchange='userUpdate()'><span id='userName'></span><br>
-	Addr:<span id='addr1'>0x</span><br>
-	Ether:<span id='bal'>0</span>eth<br>
-	PPUnclaimed:<span id='ppbal'>0</span>eth<input value='Claim' type='button' id='claim' onclick='claim()' /><br>
-	PPShare:<span id='ppshares'>0</span>tokens<br>
-	<br>
-	Recipient:<input type='number' id='recipID' max='4' min='0' value='0' onchange='recipUpdate()'><span id='recipName'></span><br>
-	Addr:<span id='addr2'>0x</span><br>
-	<input type='number' id='tokenAmount' min='0' value='0'>
-	<input value='Transfer' type='button' id='trans' onclick='transfer()' /><br>
-</div>
-<div>
-</div>
+	<h3>Ether Poly Pay - <span id="sym"></span>/ETH
+	<button onclick='update()' type='button'>Refresh</button></h3>
+<table>
+	<tr><td>Total Supply</td><td id='totsupply'></td></tr>
+	<tr><td>Total Payments</td><td id='totpayments'></td></tr>
+	<tr><td>Total Unclaimed</td><td id='unclaimed'></td></tr>
+	<tr><td>Pay to Contract</td><td><input type='number' id='payAmount'></td>
+	<td><input value='Pay' type='button' id='query' onclick='pay()' /></td></tr>
+	<th>HOLDER</th>
+	<tr><td>Account ID</td><td><input id="accid" type="number" max='4' min='0' value='0' onchange='update()'></td>
+	<td id='userName' colspan=2></td></tr>
+	<tr><td>Account Addr</td><td id='accAddr' colspan=2></td></tr>
+	<tr><td>Token Balance</td><td id='balance'></td></tr>
+	<tr><td>Ether Balance</td><td id='ethBalance'></td><td><input onclick='withdraw()' type='button' value='Withdraw' /></td></tr>
+	<tr><td>Claimable Eth</td><td id='claimable'></td><td><input value='Claim' type='button' id='claim' onclick='claim()' /></td></tr>
+	<tr><td>Recipient</td><td><input type='number' id='recipID' max='4' min='0' value='0' onchange='recipUpdate()'><td id='recipName'></td></tr>
+	<tr><td>Addr</td><td id='addr2' colspan='2'></td></tr>
+	<tr><td>Tansfer Amount</td><td><input type='number' id='tokenAmount' min='0' value='0'></td><td>
+	<input value='Transfer' type='button' id='trans' onclick='transfer()' /></td></tr>
+	<th>TRADE</th>
+	<tr><td>Ask</td><td id='lowestAsk'></td><td id="askVol"></td></tr>
+	<tr><td>Bid</td><td id='highestBid'></td><td id="bidVol"></td></tr>
+	<tr><td><button onclick='buy()' type='button'>Buy</button></td><td><button onclick='sell()' type='button'>Sell</button></td>
+	<td><input id="make" type="checkbox" checked>Make order if not filled</td></tr>
+	<tr><td>Price</td><td>Amount</td><td>Total ether</td></tr>
+	<tr><td><input id="price" type="number"></td><td><input id="amount" type="number"></td><td><input id="total" type="number"></td></tr>
+</table>
 </body>
 </html>
